@@ -216,6 +216,7 @@ export default function App() {
     landingStreak: 0,
     gemStreak: 0,
     difficultyMultiplier: 1.0,
+    selectedDigit: 1, // Add digit to ref to avoid effect restarts
     trail: [] as { x: number; y: number; opacity: number }[],
     parallax: [] as { x: number; y: number; size: number; speed: number; opacity: number }[],
     cameraShake: 0,
@@ -407,6 +408,7 @@ export default function App() {
       landingStreak: 0,
       gemStreak: 0,
       difficultyMultiplier: 1.0,
+      selectedDigit: digit,
       challengeCompleted: false,
       challengeTimeLeft: challenge ? challenge.timeLimit : 0,
       trail: [],
@@ -515,7 +517,7 @@ export default function App() {
     
     // Idle bobbing / Breathing / Running motion
     const time = Date.now() / 200;
-    const props = NUMBER_DATA[selectedDigit];
+    const props = NUMBER_DATA[g.selectedDigit];
     const breathe = Math.sin(time) * 2;
     
     // Immediate input lean (Anticipation)
@@ -682,7 +684,7 @@ export default function App() {
         animationFrameId = requestAnimationFrame(update);
         return;
       }
-      const props = NUMBER_DATA[selectedDigit];
+      const props = NUMBER_DATA[g.selectedDigit]; // Use ref value
 
       // Weather Logic
       if (Math.random() < 0.001) { // Much rarer toggle
@@ -1104,7 +1106,7 @@ export default function App() {
       if (!g.gameOver) {
         const isInvincible = Date.now() < g.invincibleUntil;
         if (!isInvincible || Math.floor(Date.now() / 100) % 2 === 0) {
-          drawDigitAsBoard(ctx, selectedDigit, g.x, g.y, BOARD_SIZE, g.tilt);
+          drawDigitAsBoard(ctx, g.selectedDigit, g.x, g.y, BOARD_SIZE, g.tilt);
           drawStickman(ctx, g.x, g.y - 15, g.tilt);
         }
       }
@@ -1184,8 +1186,9 @@ export default function App() {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const g = gameRef.current;
-      if (e.code === 'Space' && !g.isJumping && (gameState === 'PLAYING' || gameState === 'TUTORIAL')) {
-        const jumpPower = NUMBER_DATA[selectedDigit].jumpHeight;
+      if ((e.code === 'Space' || e.key === ' ') && !g.isJumping && (gameState === 'PLAYING' || gameState === 'TUTORIAL')) {
+        e.preventDefault(); // CRITICAL: Stop space from scrolling or clicking buttons
+        const jumpPower = NUMBER_DATA[g.selectedDigit].jumpHeight;
         // Jump vector is influenced by current tilt: leaning into the jump affects trajectory
         g.vy = -jumpPower * Math.cos(g.tilt);
         g.speed += Math.sin(g.tilt) * (jumpPower * 0.15); 
@@ -1194,7 +1197,8 @@ export default function App() {
         g.totalJumps++;
         playJumpSound();
         // Change digit on jump - cycling through all for variety
-        setSelectedDigit(prev => (prev % 10) + 1);
+        g.selectedDigit = (g.selectedDigit % 10) + 1; // Update ref directly
+        setSelectedDigit(g.selectedDigit); // Sync state for HUD without triggering effect restart
         switchSound();
 
         if (gameState === 'TUTORIAL' && tutorialStep === 2) {
@@ -1230,7 +1234,7 @@ export default function App() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
     };
-  }, [gameState, selectedDigit, weather]);
+  }, [gameState]); // Only depend on gameState to preserve game loop continuity
 
   return (
     <div className="relative w-full h-screen bg-[#020617] text-slate-100 font-sans overflow-hidden">
